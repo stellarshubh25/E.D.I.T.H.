@@ -1,0 +1,8 @@
+{
+  "name": "edith",
+  "version": "1.0.0",
+  "description": "E.D.I.T.H. - continuous app permission monitoring and trust scoring (NITSHACKS 9.0)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "license": "MIT"
+}

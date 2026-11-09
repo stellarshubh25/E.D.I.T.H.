@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E.D.I.T.H. Permission Monitor</title>
+<style>
+  :root {
+    --paper: #f2f4f0;
+    --card: #fbfcfa;
+    --ink: #18221d;
+    --muted: #5d6a63;
+    --line: #d3d9d2;
+    --safe: #2e7d50;
+    --watch: #b97a0b;
+    --risky: #c4372b;
+    --info: #2f5d8a;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 var(--sans); }
+  h1, h2, h3 { margin: 0; font-weight: 600; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+           padding: 5px 11px; border-radius: 6px; }
+  button:hover { border-color: var(--ink); }
+  button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.danger { background: var(--risky); color: #fff; border-color: var(--risky); }
+  button.small { padding: 2px 8px; font-size: 13px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 18px 28px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header h1 { font-family: var(--serif); font-size: 26px; letter-spacing: .02em; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; margin-right: 8px; }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--safe); display: inline-block; }
+  .live.off i { background: var(--risky); }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 22px 28px 48px; display: grid; gap: 22px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  section > h2 { font-size: 17px; margin-bottom: 10px; }
+  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+
+  /* App rows */
+  .app { display: grid; grid-template-columns: 260px 1fr; gap: 20px; padding: 16px 0 16px 16px;
+         border-top: 1px solid var(--line); border-left: 6px solid var(--safe); margin-left: -2px; }
+  .app:first-of-type { border-top: 0; }
+  .app.watch { border-left-color: var(--watch); }
+  .app.risky { border-left-color: var(--risky); }
+  .app.suspended { opacity: .72; }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } }
+  .app h3 { font-size: 17px; }
+  .app .purpose { color: var(--muted); font-size: 13px; }
+  .score { font-family: var(--serif); font-size: 52px; line-height: 1; margin-top: 8px; }
+  .score small { font-family: var(--sans); font-size: 14px; color: var(--muted); margin-left: 6px; }
+  .band { font-weight: 600; }
+  .band.safe { color: var(--safe); } .band.watch { color: var(--watch); } .band.risky { color: var(--risky); }
+  .gauge { position: relative; height: 8px; background: #e4e9e2; border-radius: 4px; margin: 10px 0 6px; overflow: hidden; }
+  .gauge b { position: absolute; inset: 0 auto 0 0; background: var(--safe); transition: width .5s; }
+  .gauge.watch b { background: var(--watch); } .gauge.risky b { background: var(--risky); }
+  .gauge u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--card); }
+  .state-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+
+  .perm { display: grid; grid-template-columns: 110px 100px 70px 1fr; gap: 8px; align-items: center;
+          padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .perm:last-child { border-bottom: 0; }
+  .perm .res { font-weight: 600; text-transform: capitalize; }
+  .perm .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 12.5px; border: 1px solid var(--line); }
+  .tag.granted { color: var(--safe); border-color: var(--safe); }
+  .tag.restricted { color: var(--watch); border-color: var(--watch); }
+  .tag.pending { color: var(--info); border-color: var(--info); }
+  .tag.revoked { color: var(--risky); border-color: var(--risky); }
+  .sens { color: var(--risky); font-size: 12px; margin-left: 4px; }
+  .perm-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+
+  /* Chart */
+  #chart svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; margin-top: 6px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle;
+                          background: var(--c); }
+
+  /* Lists */
+  .rec { padding: 10px 0; border-top: 1px solid var(--line); }
+  .rec:first-of-type { border-top: 0; }
+  .rec p { margin: 0 0 6px; }
+  .sev { font-size: 12.5px; font-weight: 600; margin-right: 6px; }
+  .sev.high { color: var(--risky); } .sev.medium { color: var(--watch); } .sev.low { color: var(--muted); } .sev.info { color: var(--info); }
+  .feed { max-height: 340px; overflow: auto; font-size: 13.5px; }
+  .row { display: grid; grid-template-columns: 62px 1fr; gap: 8px; padding: 5px 0; border-top: 1px solid #e8ece6; }
+  .row:first-child { border-top: 0; }
+  .row time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .row.denied { color: var(--risky); }
+  .row small { color: var(--muted); display: block; }
+  .empty { color: var(--muted); padding: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>E.D.I.T.H.</h1>
+    <p>Watches how your apps use your data and keeps their permissions in check.</p>
+  </div>
+  <div class="controls">
+    <span class="live" id="live"><i></i><span>Live</span></span>
+    <button id="btnMisbehave" class="danger">Make FitnessTracker misbehave</button>
+    <button id="btnReset">Reset demo</button>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>Your apps</h2>
+    <div id="apps"></div>
+  </section>
+
+  <div class="two">
+    <section>
+      <h2>Trust score over the last 90 seconds</h2>
+      <div id="chart"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <section>
+      <h2>Recommended changes</h2>
+      <div id="recs"></div>
+    </section>
+  </div>
+
+  <div class="two">
+    <section>
+      <h2>Data access log</h2>
+      <div class="feed" id="logs"></div>
+    </section>
+    <section>
+      <h2>Alerts and permission changes</h2>
+      <div class="feed" id="events"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const COLORS = ['#2f5d8a', '#1f8a8a', '#8a4f7d'];
+const $ = (id) => document.getElementById(id);
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const time = (ts) => new Date(ts).toLocaleTimeString([], { hour12: false });
+const last = {};          // last rendered HTML per region, to avoid needless DOM rewrites
+let recMap = {};          // recommendation id -> action
+let misbehaving = false;
+
+function setHtml(id, html) {
+  if (last[id] !== html) { $(id).innerHTML = html; last[id] = html; }
+}
+
+async function post(url, body) {
+  await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  refresh();
+}
+
+/* ---------- Renderers ---------- */
+function renderApps(apps) {
+  setHtml('apps', apps.map((a) => {
+    const perms = a.perms.map((p) => {
+      const acts = [];
+      if (p.status === 'pending') acts.push(['approve', 'Approve']);
+      if (p.status === 'granted') acts.push(['restrict', 'Restrict']);
+      if (p.status === 'restricted') acts.push(['approve', 'Allow fully']);
+      if (p.status !== 'revoked') acts.push(['revoke', 'Revoke']);
+      if (p.status === 'revoked') acts.push(['approve', 'Re-grant']);
+      return `<div class="perm">
+        <div class="res">${p.resource}${p.sensitive ? '<span class="sens">sensitive</span>' : ''}</div>
+        <div><span class="tag ${p.status}">${cap(p.status)}</span></div>
+        <div>${p.uses} use${p.uses === 1 ? '' : 's'}</div>
+        <div class="acts">${acts.map(([v, l]) =>
+          `<button class="small" data-act="perm" data-app="${a.id}" data-res="${p.resource}" data-val="${v}">${l}</button>`).join('')}</div>
+      </div>`;
+    }).join('');
+    const suspended = a.status === 'suspended';
+    return `<div class="app ${a.band} ${suspended ? 'suspended' : ''}">
+      <div>
+        <h3>${a.name}</h3>
+        <div class="purpose">${a.purpose}</div>
+        <div class="score">${a.score}<small>/ 100 trust score</small></div>
+        <div class="gauge ${a.band}"><b style="width:${a.score}%"></b><u style="left:50%"></u><u style="left:80%"></u></div>
+        <div class="state-line"><span class="band ${a.band}">${cap(a.band)}</span>
+          ${suspended ? '<span>Suspended</span>' : ''}
+          <button class="small ${suspended ? '' : 'danger'}" data-act="status" data-app="${a.id}" data-val="${suspended ? 'active' : 'suspended'}">
+            ${suspended ? 'Reactivate' : 'Suspend'}</button></div>
+      </div>
+      <div><div class="perm-head"><strong>Permissions</strong></div>${perms}</div>
+    </div>`;
+  }).join(''));
+}
+
+function renderChart(apps) {
+  const W = 640, H = 260, L = 34, R = 90, T = 10, B = 22;
+  const x = (i, n) => L + (i / Math.max(n - 1, 1)) * (W - L - R);
+  const y = (v) => T + (1 - v / 100) * (H - T - B);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trust score history for each app">`;
+  svg += `<rect x="${L}" y="${y(100)}" width="${W - L - R}" height="${y(80) - y(100)}" fill="#2e7d50" opacity=".07"/>`;
+  svg += `<rect x="${L}" y="${y(80)}" width="${W - L - R}" height="${y(50) - y(80)}" fill="#b97a0b" opacity=".08"/>`;
+  svg += `<rect x="${L}" y="${y(50)}" width="${W - L - R}" height="${y(0) - y(50)}" fill="#c4372b" opacity=".07"/>`;
+  [0, 50, 80, 100].forEach((v) => {
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#d3d9d2"/>`;
+    svg += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5d6a63">${v}</text>`;
+  });
+  apps.forEach((a, k) => {
+    const n = a.history.length;
+    const pts = a.history.map((v, i) => `${x(i, n).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    svg += `<polyline points="${pts}" fill="none" stroke="${COLORS[k]}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    svg += `<circle cx="${x(n - 1, n)}" cy="${y(a.score)}" r="4" fill="${COLORS[k]}"/>`;
+    svg += `<text x="${W - R + 10}" y="${y(a.score) + 4 + (k - 1) * 12}" font-size="12" fill="${COLORS[k]}">${a.name} ${a.score}</text>`;
+  });
+  svg += '</svg>';
+  setHtml('chart', svg);
+  setHtml('legend', apps.map((a, k) => `<span style="--c:${COLORS[k]}">${a.name}</span>`).join(''));
+}
+
+function renderRecs(recs) {
+  recMap = {};
+  recs.forEach((r) => (recMap[r.id] = r.action));
+  setHtml('recs', recs.length ? recs.map((r) => `<div class="rec">
+      <p><span class="sev ${r.severity}">${cap(r.severity)}</span>${r.text}</p>
+      <button class="small primary" data-act="rec" data-id="${r.id}">${r.actionLabel}</button>
+    </div>`).join('') : '<div class="empty">Nothing to fix right now. Every app is behaving as expected.</div>');
+}
+
+function renderLogs(logs) {
+  setHtml('logs', logs.length ? logs.map((l) => `<div class="row ${l.allowed ? '' : 'denied'}">
+      <time>${time(l.ts)}</time>
+      <div><strong>${l.app}</strong> ${l.allowed ? 'accessed' : 'was denied'} ${l.resource}
+        <small>${l.reason}${l.note ? ' · ' + l.note : ''}</small></div></div>`).join('')
+    : '<div class="empty">No data access yet. Activity appears here as apps use your data.</div>');
+}
+
+function renderEvents(events) {
+  setHtml('events', events.length ? events.map((e) => `<div class="row">
+      <time>${time(e.ts)}</time>
+      <div><span class="sev ${e.severity}">${e.kind === 'alert' ? cap(e.severity) : 'Change'}</span>${e.message}</div></div>`).join('')
+    : '<div class="empty">No alerts yet.</div>');
+}
+
+/* ---------- Polling ---------- */
+async function refresh() {
+  try {
+    const s = await (await fetch('/api/state')).json();
+    misbehaving = s.misbehaving;
+    $('btnMisbehave').textContent = misbehaving ? 'Stop misbehaving' : 'Make FitnessTracker misbehave';
+    $('btnMisbehave').className = misbehaving ? '' : 'danger';
+    renderApps(s.apps); renderChart(s.apps); renderRecs(s.recommendations);
+    renderLogs(s.logs); renderEvents(s.events);
+    $('live').className = 'live'; $('live').lastChild.textContent = 'Live';
+  } catch (e) {
+    $('live').className = 'live off'; $('live').lastChild.textContent = 'Server not reachable';
+  }
+}
+
+/* ---------- Clicks ---------- */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const d = b.dataset;
+  if (d.act === 'perm') post('/api/permission', { appId: d.app, resource: d.res, value: d.val });
+  if (d.act === 'status') post('/api/status', { appId: d.app, status: d.val });
+  if (d.act === 'rec') {
+    const a = recMap[d.id];
+    if (a) post(a.type === 'permission' ? '/api/permission' : '/api/status', a);
+  }
+});
+$('btnMisbehave').onclick = () => post('/api/simulator', { misbehaving: !misbehaving });
+$('btnReset').onclick = () => post('/api/reset');
+
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
